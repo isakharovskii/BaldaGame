@@ -7,13 +7,17 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.*;
 import java.util.LinkedList;
+import java.util.Scanner;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -25,48 +29,57 @@ import javax.swing.JTextArea;
 
 public class GameClient {
 	
-	ServerSocket ssocket;
+	static ServerSocket ssocket = null;
 	int port = 10001;
 	
-	private static Socket socket;
+	private static Socket socket = null;
 	private static InputStream is;
 	private static OutputStream os;
 	private static DataInputStream in;
 	private static DataOutputStream out;
 	
-	GameClient(String str)
+	GameClient(String str, int n, boolean vsBot)
 	{
-		switch(str)
+		if (!vsBot)
 		{
-		case "Host":
+			switch(str)
+			{
+			case "Host":
+				try{
+					
+					ssocket = new ServerSocket(port);
+					
+					socket = ssocket.accept();
+					
+					is = socket.getInputStream();
+					os = socket.getOutputStream();
+					
+					in = new DataInputStream(is);
+					out = new DataOutputStream(os);
+					
+					new gameInterface(1, n);
+				}catch(Exception e){e.printStackTrace();}
+				break;
+			case "Join":
+				try{
+					InetAddress Connect = mainpackage.client.getAddress();
+					String str1 = Connect.getHostAddress();
+					System.out.println(str1);
+					socket = new Socket(str1, port);
+					
+					is = socket.getInputStream();
+					os = socket.getOutputStream();
+					
+					in = new DataInputStream(is);
+					out = new DataOutputStream(os);
+					
+					new gameInterface(2, n);
+				}catch(IOException e) {e.printStackTrace();}
+			}
+		} else 
+		{
 			try{
-				ssocket = new ServerSocket(port);
-				
-				socket = ssocket.accept();
-				
-				is = socket.getInputStream();
-				os = socket.getOutputStream();
-				
-				in = new DataInputStream(is);
-				out = new DataOutputStream(os);
-				
-				new gameInterface(true);
-			}catch(Exception e){e.printStackTrace();}
-			break;
-		case "Join":
-			try{
-				InetAddress Connect = mainpackage.client.getAddress();
-				String str1 = Connect.getHostAddress();
-				System.out.println(str1);
-				socket = new Socket(str1, port);
-				
-				is = socket.getInputStream();
-				os = socket.getOutputStream();
-				
-				in = new DataInputStream(is);
-				out = new DataOutputStream(os);
-				
-				new gameInterface(false);
+				new gameInterface(3, n);
 			}catch(IOException e) {e.printStackTrace();}
 		}
 		
@@ -74,47 +87,128 @@ public class GameClient {
 	
 	public static void sendWord(int x, int y, String ch, String str) throws IOException
 	{
-		out.writeInt(x);
-		out.writeInt(y);
-		out.writeUTF(ch);
-		out.writeUTF(str);
-		gameInterface.setYourPoints(gameInterface.getYourPoints() + str.length());
-		gameInterface.getUsedWords().add(str);
-		//out.flush();
+		try{
+			out.writeInt(x);
+			out.writeInt(y);
+			out.writeUTF(ch);
+			out.writeUTF(str);
+			gameInterface.setYourPoints(gameInterface.getYourPoints() + str.length());
+			gameInterface.getUsedWords().add(str);
+			//out.flush();
+		} catch (IOException e)
+		{
+			
+		}
+	}
+	public static void  sendCloseOption()
+	{
+		try
+		{
+			if (socket != null)
+			{
+				if (!socket.isClosed())out.writeInt(10);	
+			}
+		}	catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+	}
+	public static void closeAllsockets()
+	{
+		try
+		{
+			if (socket != null)
+			{
+				socket.close();
+				socket = null;
+			}
+			if (ssocket != null)
+			{
+				ssocket.close();
+				ssocket = null;
+			}
+		}catch (SocketException e)
+		{
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	public static void sendStartWord(String wrd)
+	{
+		try {
+			out.writeUTF(wrd);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	public static void getStartWord()
+	{
+		try
+		{
+			String startWord = in.readUTF();
+			gameInterface.setStartWord(startWord);
+		}catch(IOException e)
+		{
+			e.printStackTrace();
+		}
+		
 	}
 	public static void getWord() throws IOException
 	{
-		int x, y;
-		x = in.readInt();
-		y = in.readInt();
-		String ch = in.readUTF();
-		String str = in.readUTF();
-		
-		gameInterface.setEnemyPoints(gameInterface.getEnemyPoints() + str.length());
-		gameInterface.getUsedWords().add(str);
-		
-		String result = gameInterface.getYourPoints() + "\t" + gameInterface.getEnemyPoints();
-		gameInterface.getScore().setText(result);
-		
-		
-		gameInterface.setNumberOfturns(gameInterface.getNumberOfturns() + 1);
-		System.out.println(x + " " + y + " " + str);
-		if (gameInterface.getNumberOfturns() >= 25)
+		try{
+			int x, y;
+			x = in.readInt();
+			if (x == 10) 
+			{
+				gameInterface.ErrorMessage();
+				if (ssocket != null)
+				{
+					ssocket.close();
+				}
+				socket.close();
+			}
+			else
+			{
+				y = in.readInt();
+				String ch = in.readUTF();
+				String str = in.readUTF();
+				
+				gameInterface.setEnemyPoints(gameInterface.getEnemyPoints() + str.length());
+				gameInterface.getUsedWords().add(str);
+				
+				String result = gameInterface.getYourPoints() + ":" + gameInterface.getEnemyPoints();
+				gameInterface.getScore().setAlignmentX(JLabel.CENTER_ALIGNMENT);
+				gameInterface.getScore().setAlignmentX(JLabel.CENTER_ALIGNMENT);
+				gameInterface.getScore().setText(result);
+				
+				gameInterface.setNumberOfturns(gameInterface.getNumberOfturns() + 1);
+				System.out.println(x + " " + y + " " + str);
+				if (gameInterface.getNumberOfturns() >= gameInterface.n * gameInterface.n)
+				{
+					JOptionPane.showConfirmDialog(gameInterface.getFrame(), "You lose");
+				} else {
+					gameInterface.getButtons()[x][y].setText(ch);
+					gameInterface.setYourTurn(true);
+					gameInterface.startNewTurn();
+					gameInterface.refreshColor(true);
+				}
+			}
+		} catch (SocketException e)
 		{
-			JOptionPane.showConfirmDialog(gameInterface.getFrame(), "You lose");
-		} else {
-			gameInterface.getButtons()[x][y].setText(ch);
-			gameInterface.setYourTurn(true);
-			gameInterface.startNewTurn();
-			gameInterface.refreshColor(true);
+			e.printStackTrace();
+			gameInterface.ErrorMessage();
 		}
 	}
 }
 
 class gameInterface {
+	static boolean vsBot;
+	public static Node dictionary;
+	public static int n = 7;
 	private static boolean yourTurn;
-	private static String start = "GLASS";
-	static int numberOfturns = 5;
+	private static String start;
+	static int numberOfturns = n;
 	private static int yourPoints = 0;
 	private static int EnemyPoints = 0;
 	private static LinkedList<String> usedWords;
@@ -127,19 +221,75 @@ class gameInterface {
 	static JButton endTurn;
 	private static JFrame frame;
 	
-	static int[][] Map= new int[5][5];
+	static int[][] Map;
 	static int choosenX, choosenY;
 	static boolean choosenChar = false;
 	static boolean newChar;
 	static String result;
+	private Scanner sc;
 	
-	gameInterface(boolean isHost) throws IOException
+	gameInterface(int gameChoose, int n) throws IOException
 	{
-		setYourTurn(isHost);
-		makeGUI();
-		if (!isHost) GameClient.getWord();
+		dictionary = new Node();
+		int k = 0;
+		while ( (k = Math.abs(new java.util.Random().nextInt()%150)) == 0){}
+		System.out.println("K is:" + k);
+		sc = new Scanner(new File("REVERSE.TXT"));
+		int i = 0;
+		while (sc.hasNext())
+		{
+			String next = sc.next();
+			dictionary.add(next.toUpperCase(), next.toUpperCase());
+			if (next.length() == n)
+			{
+				++i;
+				//System.out.println(next + "     " + i);
+			}
+			if (i == k && next.length() == n) start = next.toUpperCase();
+		}
+		gameInterface.n = n;
+		System.out.println(start);
+		if (gameChoose == 3)
+		{
+			yourTurn = true;
+			vsBot = true;
+			makeGUI();
+		} else
+		{
+			vsBot = false;
+			boolean isHost;
+			if (gameChoose == 1)
+			{
+				isHost = true;
+				GameClient.sendStartWord(start);
+			}
+			else
+			{
+				GameClient.getStartWord();
+				isHost = false;
+			}
+			setYourTurn(isHost);
+			makeGUI();
+			if (!isHost)
+			{
+				JOptionPane.showConfirmDialog(null, "Ожидание хода соперника", "Information", JOptionPane.DEFAULT_OPTION);
+				GameClient.getWord();
+			}
+		}
+		
 	}
 	
+	public static void ErrorMessage() {
+		JOptionPane.showConfirmDialog(null, "Соперник покинул игру", "Information", JOptionPane.DEFAULT_OPTION);
+		frame.setVisible(false);
+		frame = null;
+		dictionary = null;
+		usedWords = null;
+		buttons = null;
+		Map = null;
+		System.gc();
+	}
+
 	static class Listener implements ActionListener
 	{
 		public void actionPerformed(ActionEvent ae)
@@ -150,25 +300,39 @@ class gameInterface {
 				{
 				case "OK":
 					try {
-						if (mainpackage.MainClass.sendRequest(result) && choosenChar && !isUsed(result) )
+						if (dictionary.find(result) && choosenChar && !isUsed(result) && !vsBot )
 						{
 							GameClient.sendWord(choosenX, choosenY, getButtons()[choosenX][choosenY].getText(), result);
 							refreshColor(isYourTurn());
 							setNumberOfturns(getNumberOfturns() + 1);
-							if (getNumberOfturns() >= 25)
+							if (getNumberOfturns() >= n*n)
 							{
 								if (getYourPoints() > getEnemyPoints())
 									JOptionPane.showConfirmDialog(getFrame(), "You won", "message",JOptionPane.INFORMATION_MESSAGE);
 								else JOptionPane.showConfirmDialog(getFrame(), "You lose", "message", JOptionPane.INFORMATION_MESSAGE);
 							}
+							JOptionPane.showConfirmDialog(null, "Ожидание хода соперника", "Information", JOptionPane.DEFAULT_OPTION);
 							GameClient.getWord();
-						} else
+						} 
+						else
+						{
+							if (vsBot && choosenChar && dictionary.find(result) )
 							{
-								wordArea.setText("No word there");
-								buttons[choosenX][choosenY].setText("");
-								Map[choosenX][choosenY] = 1;
+								releaseBot.findWord(dictionary, makeGameField());
+								releaseBot.toNewStep();
 								startNewTurn();
 							}
+							else
+							{
+								if (choosenX != -1 && choosenY != -1)
+								{
+									wordArea.setText("No word there");
+									buttons[choosenX][choosenY].setText("");
+									Map[choosenX][choosenY] = 1;
+									startNewTurn();
+								}
+							}
+						}
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
@@ -177,9 +341,9 @@ class gameInterface {
 				default:
 					System.out.println(ae.getSource());
 					String[] tmp = ae.getSource().toString().split(",");
-					int y = Integer.parseInt(tmp[1]) / 58;
-					int x = Integer.parseInt(tmp[2]) / 43;
-					
+					int y = Integer.parseInt(tmp[1]) / buttons[0][0].getSize().width;
+					int x = Integer.parseInt(tmp[2]) / buttons[0][0].getSize().height;
+					System.out.println(x + "   " + y);
 					switch(Map[x][y])
 					{
 					case 1:
@@ -198,12 +362,12 @@ class gameInterface {
 							choosenX = x;
 							choosenY = y;
 							
-						} else Word.setText("Error");
+						} else Word.setText("Ошибка");
 						break;
 					case 2:
-						Character ch = Word.getText().charAt(0);
-						Character ch2 = getButtons()[x][y].getText().charAt(0);
-						if (x == choosenX && y == choosenY && ch2.charValue() != ch.charValue() )
+						Character ch = Word.getText().toUpperCase().charAt(0);
+						Character ch2 = getButtons()[x][y].getText().toUpperCase().charAt(0);
+						if (x == choosenX && y == choosenY && (ch2.charValue() != ch.charValue() || Word.getText().isEmpty()) )
 						{
 							getButtons()[x][y].setText(ch.toString().toUpperCase());
 						} else
@@ -230,6 +394,7 @@ class gameInterface {
 	
 	private static void makeGUI()
 	{
+		Map= new int[n][n];
 		setFrame(new JFrame("Frame"));
 		JPanel mainPanel = new JPanel();
 		
@@ -237,16 +402,16 @@ class gameInterface {
 		
 		JPanel gamePanel = new JPanel();
 		
-		gamePanel.setLayout(new GridLayout(5,5));
+		gamePanel.setLayout(new GridLayout(n,n));
 		
-		setButtons(new JButton[5][5]);
+		setButtons(new JButton[n][n]);
 		
 		result = new String();
 		
 		Listener list = new Listener();
-		for (int i = 0; i < 5; ++i)
+		for (int i = 0; i < n; ++i)
 		{
-			for (int j = 0; j < 5; ++j)
+			for (int j = 0; j < n; ++j)
 			{
 				getButtons()[i][j] = new JButton();
 				getButtons()[i][j].addActionListener(list);
@@ -255,10 +420,10 @@ class gameInterface {
 			}
 		}
 		
-		for (int i = 0; i < 5; ++i)
+		for (int i = 0; i < n; ++i)
 		{
 			Character ch = start.charAt(i);
-			getButtons()[2][i].setText(ch.toString());
+			getButtons()[n/2][i].setText(ch.toString());
 		}
 		startNewTurn();
 		
@@ -267,7 +432,7 @@ class gameInterface {
 		
 		Word = new JTextArea();
 		
-		gamePanel.setSize(new Dimension(300, 300));
+		gamePanel.setSize(new Dimension(58*n + 10, 43*n + 50));
 		
 		
 		JPanel endTurnPanel = new JPanel(new GridLayout(1,3));
@@ -284,7 +449,7 @@ class gameInterface {
 		JPanel areaPanel = new JPanel(new GridLayout(1, 3));
 		
 		label = new JLabel();
-		
+	
 		JButton clear = new JButton("Clear");
 		clear.addActionListener(list);
 		
@@ -296,6 +461,18 @@ class gameInterface {
 		mainPanel.add(endTurnPanel, BorderLayout.SOUTH);
 		mainPanel.setSize(gamePanel.getSize());
 		getFrame().setContentPane(mainPanel);
+		getFrame().addWindowListener(new WindowListener(){
+			public void windowActivated(WindowEvent arg0) {}
+			public void windowClosed(WindowEvent arg0) {}
+			public void windowClosing(WindowEvent arg0) {
+				GameClient.sendCloseOption();
+				GameClient.closeAllsockets();
+			}
+			public void windowDeactivated(WindowEvent arg0) {}
+			public void windowDeiconified(WindowEvent arg0) {}
+			public void windowIconified(WindowEvent arg0) {}
+			public void windowOpened(WindowEvent arg0) {}
+		});
 		
 		getFrame().setSize(mainPanel.getSize());
 		getFrame().setVisible(true);
@@ -305,6 +482,7 @@ class gameInterface {
 		setUsedWords(new LinkedList<String>());
 		wordArea.setEditable(false);
 		refreshColor(isYourTurn());
+		usedWords.add(start);
 		game();
 		
 		
@@ -314,27 +492,27 @@ class gameInterface {
 		choosenY = -1;
 		choosenChar = false;
 		newChar = false;
-		for (int i = 0; i < 5; ++i)
+		for (int i = 0; i < n; ++i)
 		{
-			for (int j = 0; j < 5; ++j)
+			for (int j = 0; j < n; ++j)
 			{
 				Map[i][j] = 0;
 			}
 		}
-		for (int i = 0; i < 5; ++i)
+		for (int i = 0; i < n; ++i)
 		{
-			for (int j = 0; j < 5; ++j)
+			for (int j = 0; j < n; ++j)
 			{
 				if (!getButtons()[i][j].getText().isEmpty()) Map[i][j] = 2;
 			}
 		}
-		for (int i = 0; i < 5; ++i)
+		for (int i = 0; i < n; ++i)
 		{
-			for (int j = 0; j < 5; ++j)
+			for (int j = 0; j < n; ++j)
 			{
 				if (Map[i][j] == 2)
 				{
-					if ( (i + 1) < 5)
+					if ( (i + 1) < n)
 					{
 						if (Map[i+1][j] != 2) Map[i + 1][j] = 1;
 					}
@@ -342,7 +520,7 @@ class gameInterface {
 					{
 						if (Map[i-1][j] != 2) Map[i - 1][j] = 1;
 					}
-					if ( (j + 1) < 5)
+					if ( (j + 1) < n)
 					{
 						if (Map[i][j+1] != 2) Map[i][j+1] = 1;
 					}
@@ -371,16 +549,16 @@ class gameInterface {
 		
 		Map[x][y] = 4;
 		
-		for (int i = 0; i < 5; ++i)
+		for (int i = 0; i < n; ++i)
 		{
-			for (int j = 0; j < 5; ++j)
+			for (int j = 0; j < n; ++j)
 			{
 				if (Map[i][j] == 3) Map[i][j] = 2;
 			}
 		}
-		for (int j = 0; j < 5; ++j)
+		for (int j = 0; j < n; ++j)
 		{	
-			for (int i = 0; i < 5; ++i)
+			for (int i = 0; i < n; ++i)
 			{
 				if (Math.abs(j - x) == 1)
 				{
@@ -393,9 +571,9 @@ class gameInterface {
 					}
 			}
 		}
-		for (int i= 0; i < 5; ++i)
+		for (int i= 0; i < n; ++i)
 		{
-			for (int j = 0; j < 5; ++j)
+			for (int j = 0; j < n; ++j)
 			{
 				if (Map[i][j] != 3) getButtons()[i][j].setEnabled(false); else getButtons()[i][j].setEnabled(true);
 			}
@@ -404,9 +582,9 @@ class gameInterface {
 	}
 	public static void game()
 	{
-		for (int i= 0; i < 5; ++ i)
+		for (int i= 0; i < n; ++ i)
 		{
-			for (int j = 0; j < 5; ++j)
+			for (int j = 0; j < n; ++j)
 			{
 				switch(Map[i][j])
 				{
@@ -482,5 +660,33 @@ class gameInterface {
 	}
 	public static void setYourPoints(int yourPoints) {
 		gameInterface.yourPoints = yourPoints;
+	}
+	public static String[][] makeGameField()
+	{
+		String [][] gamefield = new String [n][n];
+		for (int i = 0; i <n; ++i)
+		{
+			for (int j = 0; j < n; ++j)
+			{
+				gamefield[i][j] = buttons[i][j].getText();
+			}
+		}
+		return gamefield;
+	}
+	public static void setButton(int x, int y, String ch)
+	{
+		buttons[x][y].setText(ch);
+	}
+	public static void addUsedWord(String str)
+	{
+		usedWords.add(str);
+	}
+	public static void increaseEnemyPoint(int point)
+	{
+		EnemyPoints += point;
+	}
+	public static void setStartWord(String wrd)
+	{
+		start = wrd;
 	}
 }

@@ -10,10 +10,10 @@ import java.net.*;
 public class client {
 	 static Socket socket;
 	 static int port = 10101;
-	 private static InetAddress toConnect;
-	 private static String ServerIP = "192.168.1.107";
+	 private static InetAddress toConnect ;
+	 private static String ServerIP = "127.0.0.1";
 	 
-	 public static void host()
+	 public static void host(int n)
 	 {
 		 try {
 			socket = new Socket(ServerIP, port);
@@ -23,6 +23,7 @@ public class client {
 			DataOutputStream out = new DataOutputStream(os);
 			
 			out.writeInt(0);
+			out.writeInt(n);
 			out.writeUTF(InetAddress.getLocalHost().getHostAddress().toString());
 			out.writeInt(2);
 			
@@ -33,9 +34,10 @@ public class client {
 		}	 
 	 }
 	 
-	 public static void join()
+	 public static void join(int n)
 	 {
 		 try{
+			 System.out.println("IP: " + ServerIP);
 			 socket = new Socket(ServerIP, port);
 			 
 			 OutputStream os = socket.getOutputStream();
@@ -46,6 +48,7 @@ public class client {
 			 
 			 out.writeInt(1);
 			 
+			 out.writeInt(n);
 			 String str = in.readUTF();
 			 if (str.equals("Error")) 
 			 {
@@ -65,6 +68,10 @@ public class client {
 		 {
 			 e.printStackTrace();
 		 }
+	 }
+	 public static void setIp(String str)
+	 {
+		 ServerIP = str;
 	 }
 	 public static InetAddress getAddress()
 	 {
